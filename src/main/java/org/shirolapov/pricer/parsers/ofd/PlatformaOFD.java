@@ -27,7 +27,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class PlatformaOFD {
-    public SalesReceipt getSalesReceipt(HashMap<String, String> hash) throws IOException, ParseException {
+    public SalesReceipt getSalesReceipt(HashMap<String, String> hash) throws IOException, ParseException, ReceiptsNotFoundException {
         URL salesReceiptUrl = this.getURLToReceiptOnSite(
                 hash.get("fn"), hash.get("fp"), hash.get("i")
         );
@@ -165,7 +165,7 @@ public class PlatformaOFD {
         return salesReceipt;
     }
 
-    private URL getURLToReceiptOnSite(String fn, String fpd, String fd) throws IOException {
+    private URL getURLToReceiptOnSite(String fn, String fpd, String fd) throws IOException, ReceiptsNotFoundException {
         String url = "https://lk.platformaofd.ru/web/noauth/cheque/search";
 
         CookieStore cookieStore = new BasicCookieStore();
@@ -218,6 +218,14 @@ public class PlatformaOFD {
         httpPost.setHeader("Referer", "https://lk.platformaofd.ru/web/noauth/cheque/search");
 
         CloseableHttpResponse httpResponse2 = httpclient.execute(httpPost, context);
+
+        if (httpResponse2.getStatusLine().getStatusCode() == 200) {
+            String contentFromHttpResponse2 = getContentFromResponse(httpResponse2);
+            if (contentFromHttpResponse2.contains("Чек не найден")) {
+                System.out.println("Нету чека");
+                throw new ReceiptsNotFoundException("");
+            }
+        }
 
         return new URL("https://lk.platformaofd.ru" + httpResponse2.getFirstHeader("Spring-Redirect-URL").getValue());
     }

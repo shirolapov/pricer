@@ -17,6 +17,7 @@ import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.shirolapov.pricer.parsers.ofd.PlatformaOFD;
+import org.shirolapov.pricer.parsers.ofd.ReceiptsNotFoundException;
 import org.shirolapov.pricer.parsers.ofd.Taxcom;
 
 import javax.imageio.ImageIO;
@@ -29,10 +30,12 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 
+import static java.lang.System.exit;
+
 
 public class App {
 
-    public static void main(String[] args) throws ArrayIndexOutOfBoundsException, IOException, FormatException, ChecksumException, NotFoundException, ParseException {
+    public static void main(String[] args) throws ArrayIndexOutOfBoundsException, IOException, FormatException, ChecksumException, NotFoundException, ParseException, ReceiptsNotFoundException {
         String path = args[0];
         String market = args[1];
         assert path != null;
@@ -40,6 +43,7 @@ public class App {
 
         // Parsing QR code
         BufferedImage tmpBfrImage;
+        System.out.println("Path: " + path);
         tmpBfrImage = ImageIO.read(new File(path));
         BinaryBitmap binaryBitmap = new BinaryBitmap(
                 new HybridBinarizer(
@@ -52,6 +56,7 @@ public class App {
         // Parser receipt text to hashMap
         StringParser stringParser = new StringParser();
         HashMap<String, String> dataOfReceipt = stringParser.parseString(TextFromCheck);
+        System.out.println(dataOfReceipt);
 
         // Generate id for elastic from receipt text
         byte[] bytesOfMessage = TextFromCheck.getBytes(StandardCharsets.UTF_8);
@@ -67,12 +72,17 @@ public class App {
         // Add receipt and purchase to elastic if not exist
         if (!exists) {
             SalesReceipt salesReceipt = null;
-            if (market.equals("Lenta")) {
-                Taxcom taxcom = new Taxcom();
-                salesReceipt = taxcom.getSalesReceipt(dataOfReceipt);
-            } else if (market.equals("Megas")) {
-                PlatformaOFD platformaOFD = new PlatformaOFD();
-                salesReceipt = platformaOFD.getSalesReceipt(dataOfReceipt);
+            try {
+                if (market.equals("Lenta")) {
+                    Taxcom taxcom = new Taxcom();
+                    salesReceipt = taxcom.getSalesReceipt(dataOfReceipt);
+                } else if (market.equals("Megas")) {
+                    PlatformaOFD platformaOFD = new PlatformaOFD();
+                    salesReceipt = platformaOFD.getSalesReceipt(dataOfReceipt);
+                }
+            } catch (ReceiptsNotFoundException ex) {
+                System.out.println("Check not found");
+                exit(1);
             }
 
             Gson gson = new Gson();
